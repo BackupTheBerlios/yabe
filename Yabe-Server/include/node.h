@@ -19,25 +19,26 @@
 struct Connection
 {
 	int Socket;
-	
+	Connection *Next;
+	Connection()
+	{Next = NULL;
+	Socket = 0;
+	}
 };
-	
+
 class Node : private LinkedList<Connection>
 {
 	private:
 	int MainSock;
-	int gHighSock;
-    fd_set gSocks;
+	int HighSock;
+	int MaxConnections;
+	int Port;
 	struct sockaddr_in ServerAddress;
+	void SetNonBlocking (int Sock);
 	
 	public:
 	Node (int Port, int MaxConnections);
-	void SetNonBlocking (int Sock);
-	void BuildSelectList ();
-	void ReadSocks ();
-	
-	int& NewSocket();
-	int& GetCurrentSocket();
-	int& GetPreviousSocket();
-	int& GetNextSocket();
+	void BindSocket ();
+	void BuildSelectList (fd_set *SocksFd);
+	void ManageSocks ();
 };
