@@ -13,11 +13,16 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
-
+#include <netinet/in.h>
 #include "include/linkedlist.h"
 
-template <class Type>
-class Node : private LinkedList<Type>
+struct Connection
+{
+	int Socket;
+	
+};
+	
+class Node : private LinkedList<Connection>
 {
 	private:
 	int MainSock;
@@ -36,31 +41,3 @@ class Node : private LinkedList<Type>
 	int& GetPreviousSocket();
 	int& GetNextSocket();
 };
-
-template <class Type>
-int& Node<Type>::NewSocket()
-{
-	Type *Temp = AddItem();
-	return Temp->Socket;
-}
-
-template <class Type>
-int& Node<Type>::GetNextSocket()
-{
-	Type *Temp = Advance();
-	return Temp->Socket;
-}
-
-template <class Type>
-int& Node<Type>::GetPreviousSocket()
-{
-	Type *Temp = Rewind();
-	return Temp->Socket;
-}
-
-template <class Type>
-int& Node<Type>::GetCurrentSocket()
-{
-	Type *Temp = Current();
-	return Temp->Socket;
-}
