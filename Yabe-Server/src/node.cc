@@ -14,27 +14,65 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include "include/node.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
 
-int& Node::NewSocket()
+void Node::BindSocket()
 {
-	Type *Temp = AddItem();
-	return Temp->Socket;
+	int ReuseAddr = 1;
+	MainSock = socket (AF_INET, SOCK_STREAM, 0);
+	
+	setsockopt (MainSock, SOL_SOCKET, SO_REUSEADDR, &ReuseAddr,
+		    sizeof (ReuseAddr));
+
+	SetNonBlocking (MainSock);
+
+	memset ((char *) &ServerAddress, 0, sizeof (ServerAddress));
+	ServerAddress.sin_family = AF_INET;
+	ServerAddress.sin_addr.s_addr = htonl (INADDR_ANY);
+	ServerAddress.sin_port = htons (Port);
+	
+	if (bind(MainSock, (struct sockaddr *) &ServerAddress,
+	     sizeof (ServerAddress)) < 0)
+    {
+	fprintf( stderr, "Error binding to port");
+	exit(1);
+    }
+
+	listen (MainSock, MaxConnections);
+	HighSock = MainSock;
 }
 
-int& Node<::GetNextSocket()
+void Node::SetNonBlocking(int Sock)
 {
-	Type *Temp = Advance();
-	return Temp->Socket;
+	int opts;
+
+	opts = fcntl (Sock, F_GETFL);
+	if (opts < 0)
+	{
+		perror ("fcntl(F_GETFL)");
+		exit (EXIT_FAILURE);
+	}
+	opts = (opts | O_NONBLOCK);
+	if (fcntl (Sock, F_SETFL, opts) < 0)
+	{
+		perror ("fcntl(F_SETFL)");
+		exit (EXIT_FAILURE);
+	}
 }
 
-int& Node::GetPreviousSocket()
+void Node::BuildSelectList(fd_set *SocksFd)
 {
-	Type *Temp = Rewind();
-	return Temp->Socket;
-}
-
-int& Node::GetCurrentSocket()
-{
-	Type *Temp = Current();
-	return Temp->Socket;
+	FD_SET(MainSock, SocksFd);
+	
+	for (Connection *Traverse = SetToHead(); Traverse != NULL; 
+		Traverse = Advance())
+	{
+		if (Traverse->Socket != 0)
+		{
+			FD_SET(Traverse->Socket, SocksFd);
+		}
+	}
 }
