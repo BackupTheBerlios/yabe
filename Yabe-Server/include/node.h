@@ -15,30 +15,50 @@
  */
 #include <netinet/in.h>
 #include "include/linkedlist.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
 
 struct Connection
 {
 	int Socket;
 	Connection *Next;
-	Connection()
-	{Next = NULL;
-	Socket = 0;
+	  Connection ()
+	{
+		Next = NULL;
 	}
 };
 
-class Node : private LinkedList<Connection>
+class Node:private LinkedList < Connection >
 {
-	private:
+      private:
 	int MainSock;
-	int HighSock;
+	int HighSock;		//!
 	int MaxConnections;
 	int Port;
+	fd_set *SocksFd;
 	struct sockaddr_in ServerAddress;
-	void SetNonBlocking (int Sock);
+		
+	void DisconnectClient ();
+    void VerifyClient ();
 	
-	public:
+	struct NetCommands
+	{
+		char *Command;
+		void (*function) ();
+	};
+
+	void SetNonBlocking (int Sock);
+	void LoopTroughList (bool(Node::*pFunction)(Connection *pTraverseArgument));
+	bool AddFdListItem (Connection *pTraverseArgument);
+	void AcceptNewUser ();
+	bool ManageData (Connection *pTraverseArgument);
+
+      public:
 	Node (int Port, int MaxConnections);
+	  
 	void BindSocket ();
-	void BuildSelectList (fd_set *SocksFd);
-	void ManageSocks ();
+	void BuildSelectList (fd_set * ArgSocksFd);
+	void ManageSocks (fd_set * ArgSocksFd);
 };

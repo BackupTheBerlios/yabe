@@ -14,16 +14,13 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include "include/node.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
 
-void Node::BindSocket()
+void
+Node::BindSocket ()
 {
 	int ReuseAddr = 1;
 	MainSock = socket (AF_INET, SOCK_STREAM, 0);
-	
+
 	setsockopt (MainSock, SOL_SOCKET, SO_REUSEADDR, &ReuseAddr,
 		    sizeof (ReuseAddr));
 
@@ -33,19 +30,20 @@ void Node::BindSocket()
 	ServerAddress.sin_family = AF_INET;
 	ServerAddress.sin_addr.s_addr = htonl (INADDR_ANY);
 	ServerAddress.sin_port = htons (Port);
-	
-	if (bind(MainSock, (struct sockaddr *) &ServerAddress,
-	     sizeof (ServerAddress)) < 0)
-    {
-	fprintf( stderr, "Error binding to port");
-	exit(1);
-    }
+
+	if (bind (MainSock, (struct sockaddr *) &ServerAddress,
+		  sizeof (ServerAddress)) < 0)
+	{
+		fprintf (stderr, "Error binding to port");
+		exit (1);
+	}
 
 	listen (MainSock, MaxConnections);
 	HighSock = MainSock;
 }
 
-void Node::SetNonBlocking(int Sock)
+void
+Node::SetNonBlocking (int Sock)
 {
 	int opts;
 
@@ -63,19 +61,54 @@ void Node::SetNonBlocking(int Sock)
 	}
 }
 
-void Node::BuildSelectList(fd_set *SocksFd)
+void
+Node::BuildSelectList (fd_set *ArgSocksFd)
 {
-	FD_ZERO(SocksFd)
-	FD_SET(MainSock, SocksFd);
-	
-	Connection *Start = GetCurrentPtr();
-	Connection *Traverse = GetCurrentPtr();
-do
+	SocksFd = ArgSocksFd;
+	FD_ZERO (SocksFd);
+	FD_SET (MainSock, SocksFd);
+
+    LoopTroughList(&Node::AddFdListItem);
+}
+
+void
+Node::ManageSocks (fd_set * ArgSocksFd) //!
 {
-		if (Traverse->Socket != 0)
+	if (FD_ISSET (MainSock, SocksFd))   //!
+	{
+		AcceptNewUser ();
+	}
+
+	LoopTroughList(&Node::ManageData);
+}
+
+void
+Node::AcceptNewUser ()		//Error handling p356 + Max aantal connecties !
+{
+	Connection *NewItem = AddItem ();
+
+	NewItem->Socket = accept (MainSock, NULL, NULL);
+	SetNonBlocking (NewItem->Socket);
+}
+
+void Node::LoopTroughList (bool(Node::*pFunction)(Connection *pTraverseArgument))
+{
+	Connection *pStart = GetCurrentPtr ();
+	if (pStart != NULL)
+	{
+		Connection *pTraverse = GetCurrentPtr ();
+		do
 		{
-			FD_SET(Traverse->Socket, SocksFd);
+			if (!(this->*pFunction)(pTraverse))
+				break;
+			pTraverse = Advance ();
 		}
-		Traverse = Advance();
-	} while (Start != GetCurrentPtr());
+while (pStart != GetCurrentPtr ());
+}
+}
+
+bool Node::AddFdListItem(Connection *pTraverseArgument)
+{
+FD_SET (pTraverseArgument->Socket, SocksFd);
+return 1;
 }
