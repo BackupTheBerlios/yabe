@@ -14,11 +14,12 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include <netinet/in.h>
-#include "include/linkedlist.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#define COMMAND 2
+#include "include/linkedlist.h"
 
 struct Connection
 {
@@ -37,27 +38,46 @@ class Node:private LinkedList < Connection >
 	int HighSock;		//!
 	int MaxConnections;
 	int Port;
-	fd_set *SocksFd;
 	struct sockaddr_in ServerAddress;
-		
-	void DisconnectClient ();
-    void VerifyClient ();
-	
+
+	void DisconnectClient (char *pData);
+	void VerifyClient (char *pData);
+
 	struct NetCommands
 	{
 		char *Command;
-		void (*function) ();
-	};
+		void (Node::*pFunction) (char *pData);
+	} CommandList[COMMAND];
 
 	void SetNonBlocking (int Sock);
-	void LoopTroughList (bool(Node::*pFunction)(Connection *pTraverseArgument));
-	bool AddFdListItem (Connection *pTraverseArgument);
+	//Also possible to use global fd_set or to give pTraverse as argument
+	void LoopTroughList (bool (Node::*pFunction) (fd_set * ArgSocksFd),
+			     fd_set * ArgSocksFd);
+	bool AddFdListItem (fd_set * ArgSocksFd);
+	bool ManageData (fd_set * ArgSocksFd);
 	void AcceptNewUser ();
-	bool ManageData (Connection *pTraverseArgument);
+	char *Getline (int *Socket);
+	void ParseData (char *pBuffer);
+
+	class ErrorHandling
+	{
+	      public:
+		enum TypeOfError
+		{ Data, Accept, NonBlocking };
+		  ErrorHandling (TypeOfError S):Error (S)
+		{
+		}
+		TypeOfError GiveError ()
+		{
+			return Error;
+		}
+	      private:
+		  TypeOfError Error;
+	};
 
       public:
-	Node (int Port, int MaxConnections);
-	  
+	Node ();
+
 	void BindSocket ();
 	void BuildSelectList (fd_set * ArgSocksFd);
 	void ManageSocks (fd_set * ArgSocksFd);

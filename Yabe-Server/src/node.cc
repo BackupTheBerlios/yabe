@@ -13,7 +13,22 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
+#include <vector>
+#include <iostream>		// Alleen nodig voor cerr, dus als log er is dit weg !
 #include "include/node.h"
+using namespace std;
+
+Node::Node ()			//Port & Max = doorgegeven uit object ?
+{
+	CommandList[0].Command = "Verify";
+	CommandList[0].pFunction = &Node::VerifyClient;
+
+	CommandList[1].Command = "Disconnect";
+	CommandList[1].pFunction = &Node::DisconnectClient;
+
+	Port = 1050;		//Doorgeven van pointer naar object en zo initialiseren
+	MaxConnections = 10;
+}
 
 void
 Node::BindSocket ()
@@ -34,7 +49,7 @@ Node::BindSocket ()
 	if (bind (MainSock, (struct sockaddr *) &ServerAddress,
 		  sizeof (ServerAddress)) < 0)
 	{
-		fprintf (stderr, "Error binding to port");
+		printf ("Cannot bind primary socket");
 		exit (1);
 	}
 
@@ -50,36 +65,58 @@ Node::SetNonBlocking (int Sock)
 	opts = fcntl (Sock, F_GETFL);
 	if (opts < 0)
 	{
-		perror ("fcntl(F_GETFL)");
-		exit (EXIT_FAILURE);
+		throw ErrorHandling (ErrorHandling::NonBlocking);
 	}
 	opts = (opts | O_NONBLOCK);
 	if (fcntl (Sock, F_SETFL, opts) < 0)
 	{
-		perror ("fcntl(F_SETFL)");
-		exit (EXIT_FAILURE);
+		throw ErrorHandling (ErrorHandling::NonBlocking);
 	}
 }
 
 void
-Node::BuildSelectList (fd_set *ArgSocksFd)
+Node::BuildSelectList (fd_set * ArgSocksFd)
 {
-	SocksFd = ArgSocksFd;
-	FD_ZERO (SocksFd);
-	FD_SET (MainSock, SocksFd);
+	FD_ZERO (ArgSocksFd);
+	FD_SET (MainSock, ArgSocksFd);
 
-    LoopTroughList(&Node::AddFdListItem);
+	LoopTroughList (&Node::AddFdListItem, ArgSocksFd);
 }
 
 void
-Node::ManageSocks (fd_set * ArgSocksFd) //!
+Node::ManageSocks (fd_set * ArgSocksFd)	// This is antoher set of SocksFd !
 {
-	if (FD_ISSET (MainSock, SocksFd))   //!
+	if (FD_ISSET (MainSock, ArgSocksFd))	//!
 	{
-		AcceptNewUser ();
+		try //algemeen try block ?
+		{
+			AcceptNewUser ();
+		}
+
+		catch (ErrorHandling E)
+		{
+			switch (E.GiveError ())
+			{
+			case ErrorHandling::NonBlocking:
+				DisconnectClient (NULL);	//-> Voor log
+				cerr << "NonBlocking error: Connection deleted" << endl;
+			case ErrorHandling::Accept:
+				cerr << "Error with accepting" << endl;
+			}
+		}
+		return;		//niet echt nodig
 	}
 
-	LoopTroughList(&Node::ManageData);
+	try
+	{
+		LoopTroughList (&Node::ManageData, ArgSocksFd);
+	}
+
+	catch (ErrorHandling E)
+	{
+		if (E.GiveError () == ErrorHandling::Data)
+			cerr << "Parse or recieve error" << endl;
+	}
 }
 
 void
@@ -91,7 +128,9 @@ Node::AcceptNewUser ()		//Error handling p356 + Max aantal connecties !
 	SetNonBlocking (NewItem->Socket);
 }
 
-void Node::LoopTroughList (bool(Node::*pFunction)(Connection *pTraverseArgument))
+void
+Node::LoopTroughList (bool (Node::*pFunction) (fd_set * ArgSocksFd),
+		      fd_set * ArgSocksFd)
 {
 	Connection *pStart = GetCurrentPtr ();
 	if (pStart != NULL)
@@ -99,16 +138,105 @@ void Node::LoopTroughList (bool(Node::*pFunction)(Connection *pTraverseArgument)
 		Connection *pTraverse = GetCurrentPtr ();
 		do
 		{
-			if (!(this->*pFunction)(pTraverse))
+			if (!((this->*pFunction) (ArgSocksFd)))
 				break;
 			pTraverse = Advance ();
 		}
-while (pStart != GetCurrentPtr ());
-}
+		while (pStart != GetCurrentPtr ());
+	}
 }
 
-bool Node::AddFdListItem(Connection *pTraverseArgument)
+bool Node::AddFdListItem (fd_set * ArgSocksFd)
 {
-FD_SET (pTraverseArgument->Socket, SocksFd);
-return 1;
+	FD_SET ((GetCurrentPtr ())->Socket, ArgSocksFd);
+	return 1;
+}
+
+bool Node::ManageData (fd_set * ArgSocksFd)
+{
+	if ((FD_ISSET ((GetCurrentPtr ())->Socket, ArgSocksFd)))
+	{
+		char *
+			pBuffer;
+		if ((pBuffer = Getline (&(GetCurrentPtr ()->Socket))) != NULL)
+			ParseData (pBuffer);
+		else
+			DisconnectClient (NULL);	//Temp NULL -> moet voor log verwijzen !
+		return 0;	//End the LoopTroughList function
+	}
+	else
+		return 1;
+}
+
+char *
+Node::Getline (int *Socket)
+{
+	vector < char >CharVector;
+	char TempBuffer;
+	int Value;
+
+	while (true)
+	{
+		Value = recv (*(Socket), &TempBuffer, 1, 0);
+		switch (Value)
+		{
+		case 0:
+			return NULL;	//Disconnected
+		case -1:	//Error
+			throw ErrorHandling (ErrorHandling::Data);
+		};
+
+		if (TempBuffer == '\n')	// Let op \r is iets anders ?!
+		{
+			char *pData = new char[CharVector.size () + 1];
+			memset (pData, 0, CharVector.size () + 1);
+
+			for (unsigned int i = 0; i < CharVector.size ();
+			     i += 1)
+			{
+				pData[i] = CharVector[i];
+			}
+			return pData;
+		}
+		else
+		{
+			CharVector.push_back (TempBuffer);
+		}
+	}
+}
+
+void
+Node::ParseData (char *pBuffer)
+{
+	char *pDividedData;
+	for (int Loop = 0; Loop < COMMAND; Loop++)
+	{
+		if ((strstr (pBuffer, (CommandList[Loop].Command))) != NULL)
+		{
+			if ((strstr (pBuffer, ":")) != NULL)
+			{
+				pDividedData = strstr (pBuffer, ":");	//pdividedata local scope new maken !
+				(this->*(CommandList[Loop].pFunction))
+					(pDividedData);
+				return;
+			}
+			//delete (pBuffer); //verplaatsen !!
+		}
+	}
+	delete[]pBuffer;
+	throw ErrorHandling (ErrorHandling::Data);
+}
+
+void
+Node::VerifyClient (char *pData)
+{
+
+}
+
+void
+Node::DisconnectClient (char *pData)
+{
+	close ((GetCurrentPtr ()->Socket));
+	if (DeleteCurrentPtr () == 0)
+		throw ErrorHandling (ErrorHandling::Data); // ander error type ?
 }
