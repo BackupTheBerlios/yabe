@@ -23,6 +23,7 @@ class LinkedList
 	Type *pTail;
 	Type *pCurrent;
 	Type *Previous (Type *pIndex);
+	Type *pNull;
 
 	public:
 		
@@ -31,11 +32,13 @@ class LinkedList
 	Type *AddItem ();
 	Type *Advance();
 	Type *Rewind();
+	Type *SetToHead();
 	bool DeleteItem(Type *pDelItem);
 };
 
 template <class Type>
 LinkedList<Type>::LinkedList()
+		: Size(0), pNull(NULL)
 {
 	pHead = new Type;
 	pTail = pHead;
@@ -46,16 +49,16 @@ template <class Type>
 Type* LinkedList<Type>::AddItem()
 {
 	pTail->Next = new Type;
-	pTail=Tail->Next;
+	pTail=pTail->Next;
 }
 
 template <class Type>
 Type* LinkedList<Type>::Previous(Type *pIndex)
 {
 	Type *pTemp = pHead;
-	if (pIndex == Head) {return Head;}
+	if (pIndex == pHead) {return pHead;}
 	while (pTemp->Next != pIndex) {pTemp = pTemp->Next;}
-	return temp;
+	return pTemp;
 }
 
 template <class Type>
@@ -67,6 +70,7 @@ Type* LinkedList<Type>::Rewind()
 	return pCurrent;
 	}
 //FF nadenken nog !!!
+	return pNull;
 }
 
 template <class Type>
@@ -78,10 +82,18 @@ Type* LinkedList<Type>::Advance()
 	return pCurrent;
 	}
 //FF nadenken nog !!!
+	return pNull;
 }
 
 template <class Type>
 Type* LinkedList<Type>::GetCurrentPtr()
 {
+	return pCurrent;
+}
+
+template <class Type>
+Type* LinkedList<Type>::SetToHead()
+{
+	pCurrent = pHead;
 	return pCurrent;
 }
