@@ -14,78 +14,85 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-template <class Type>
-class LinkedList
+template < class Type > class LinkedList
 {
-	private:
+      private:
 	int Size;
-    Type *pHead;
+	Type *pHead;
 	Type *pTail;
 	Type *pCurrent;
-	Type *Previous (Type *pIndex);
+	Type *Previous (Type * pIndex);
 
-	public:
-		
+      public:
+
 	LinkedList ();
-	Type *GetCurrentPtr();
+	Type *GetCurrentPtr ();
 	Type *AddItem ();
-	Type *Advance();
-	Type *Rewind();
-	Type *SetToHead();
-	bool DeleteItem(Type *pDelItem);
+	Type *Advance ();
+	Type *Rewind ();
+	Type *SetToHead ();
+	bool DeleteItem (Type * pDelItem);
 };
 
-template <class Type>
-LinkedList<Type>::LinkedList()
-		: Size(0)
+template < class Type > LinkedList < Type >::LinkedList ():Size (0)
 {
-	pHead = new Type;
-	pTail = pHead;
-	pCurrent = pHead;
+	pHead = NULL;
+	pCurrent = NULL;
+	pTail = NULL;
 }
 
-template <class Type>
-Type* LinkedList<Type>::AddItem()
+template < class Type > Type * LinkedList < Type >::AddItem ()
 {
+	if (pHead == NULL)
+	{
+		pHead = new Type;
+		pTail = pHead;
+		pCurrent = pTail;
+		return pCurrent;
+	}
 	pTail->Next = new Type;
-	pTail=pTail->Next;
+	pTail = pTail->Next;
+	pCurrent = pTail;
+	return pCurrent;
 }
 
-template <class Type>
-Type* LinkedList<Type>::Previous(Type *pIndex)
+template < class Type > Type * LinkedList < Type >::Previous (Type * pIndex)
 {
 	Type *pTemp = pHead;
-	if (pIndex == pHead) {return pHead;}
-	while (pTemp->Next != pIndex) {pTemp = pTemp->Next;}
+	if (pIndex == pHead)
+	{
+		return pHead;
+	}
+	while (pTemp->Next != pIndex)
+	{
+		pTemp = pTemp->Next;
+	}
 	return pTemp;
 }
 
-template <class Type>
-Type* LinkedList<Type>::Rewind()
+template < class Type > Type * LinkedList < Type >::Rewind ()
 {
 	if (pCurrent != pHead)
 	{
-	pCurrent = Previous(pCurrent);
-	return pCurrent;
+		pCurrent = Previous (pCurrent);
+		return pCurrent;
 	}
 	pCurrent = pTail;
 	return pCurrent;
 }
 
-template <class Type>
-Type* LinkedList<Type>::Advance()
+template < class Type > Type * LinkedList < Type >::Advance ()
 {
 	if (pCurrent->Next != NULL)
 	{
-	pCurrent = pCurrent->Next;
-	return pCurrent;
+		pCurrent = pCurrent->Next;
+		return pCurrent;
 	}
 	pCurrent = pHead;
 	return pCurrent;
 }
 
-template <class Type>
-Type* LinkedList<Type>::GetCurrentPtr()
+template < class Type > Type * LinkedList < Type >::GetCurrentPtr ()
 {
 	return pCurrent;
 }
