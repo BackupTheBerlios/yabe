@@ -65,14 +65,17 @@ void Node::SetNonBlocking(int Sock)
 
 void Node::BuildSelectList(fd_set *SocksFd)
 {
+	FD_ZERO(SocksFd)
 	FD_SET(MainSock, SocksFd);
 	
-	for (Connection *Traverse = SetToHead(); Traverse != NULL; 
-		Traverse = Advance())
-	{
+	Connection *Start = GetCurrentPtr();
+	Connection *Traverse = GetCurrentPtr();
+do
+{
 		if (Traverse->Socket != 0)
 		{
 			FD_SET(Traverse->Socket, SocksFd);
 		}
-	}
+		Traverse = Advance();
+	} while (Start != GetCurrentPtr());
 }
